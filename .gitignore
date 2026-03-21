@@ -1,8 +1,6 @@
 # Binaries
 bin/
-app
 app.exe
-app
 # Log files
 *.log
 app.log
