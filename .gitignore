@@ -1,0 +1,42 @@
+# Binaries
+bin/
+app
+app.exe
+app
+# Log files
+*.log
+app.log
+
+# Debug directory
+debug/
+
+# Images directory (user uploaded)
+images/
+
+# Models directory (user created)
+models/
+
+# Node modules
+web/node_modules/
+
+# Build output
+web/dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+*.test
+*.out
+go.work
+
+
+RULES.md
