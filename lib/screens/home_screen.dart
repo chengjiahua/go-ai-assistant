@@ -67,8 +67,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     try {
       final args = arguments as Map<dynamic, dynamic>;
       final base64Image = args['base64Image'] as String;
-      final modelId = args['modelId'] as String;
       final side = args['side'] as String;
+
+      final config = context.read<ConfigProvider>().config;
+      final modelId = config.modelId;
 
       debugPrint('[GoAI] 悬浮窗分析请求: modelId=$modelId, side=$side');
 
@@ -76,7 +78,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         throw Exception('请先选择模型');
       }
 
-      final config = context.read<ConfigProvider>().config;
       _apiService.updateServerUrl(config.serverUrl);
 
       final result = await _apiService.analyzeBoardFromBase64(
@@ -601,7 +602,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ),
           onSubmitted: onChanged,
-          onChanged: onChanged,
         ),
       ],
     );
@@ -645,7 +645,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             border: Border.all(color: const Color(0xFF334155)),
           ),
           child: DropdownButton<String>(
-            value: value.isNotEmpty ? value : null,
+            value: (value.isNotEmpty && items.any((item) => item.id == value))
+                ? value
+                : null,
             isExpanded: true,
             underline: const SizedBox(),
             dropdownColor: const Color(0xFF1e293b),

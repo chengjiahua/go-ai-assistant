@@ -5,6 +5,7 @@ app.exe
 *.log
 app.log
 
+build/
 # Debug directory
 debug/
 
