@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -27,6 +28,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _showResults = false;
 
   static const platform = MethodChannel('com.goai.go_ai_assistant/floating');
+
+  Timer? _debounceTimer;
 
   @override
   void initState() {
@@ -601,6 +604,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               vertical: 18,
             ),
           ),
+          onChanged: (text) {
+            _debounceTimer?.cancel();
+            _debounceTimer = Timer(const Duration(milliseconds: 800), () {
+              if (text.isNotEmpty) {
+                onChanged(text.trim());
+              }
+            });
+          },
           onSubmitted: onChanged,
         ),
       ],
@@ -776,6 +787,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     setState(() {
       _showSettings = show;
     });
+
+    if (show) {
+      final config = context.read<ConfigProvider>();
+      if (config.config.serverUrl.isNotEmpty) {
+        config.refreshModelsIfNotEmpty();
+      }
+    }
   }
 
   Future<void> _startAnalyze() async {

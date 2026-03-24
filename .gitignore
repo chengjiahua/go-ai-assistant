@@ -6,6 +6,7 @@ app.exe
 app.log
 
 build/
+.dart_tool/
 # Debug directory
 debug/
 

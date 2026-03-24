@@ -669,8 +669,29 @@ class FloatingService : Service() {
                     text = "AI 推荐落子"
                     textSize = 12f
                     setTextColor(0xB3FFFFFF.toInt())
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
                     letterSpacing = 0.1f
+                })
+                
+                addView(TextView(context).apply {
+                    text = if (currentSide == "B") "黑棋" else "白棋"
+                    textSize = 10f
+                    setTextColor(if (currentSide == "B") 0xFFFFFFFF.toInt() else 0xFF000000.toInt())
+                    background = GradientDrawable().apply {
+                        setColor(if (currentSide == "B") 0xFF000000.toInt() else 0xFFFFFFFF.toInt())
+                        cornerRadius = 4 * density
+                    }
+                    setPadding((6 * density).toInt(), (2 * density).toInt(), (6 * density).toInt(), (2 * density).toInt())
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        setMargins((8 * density).toInt(), 0, 0, 0)
+                    }
+                })
+                
+                addView(View(context).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, 0, 1f)
                 })
                 
                 if (lastWinRates.isNotEmpty()) {

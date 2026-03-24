@@ -65,6 +65,32 @@ class ConfigProvider extends ChangeNotifier {
     await _loadModels();
   }
 
+  Future<void> refreshModelsIfNotEmpty() async {
+    _isLoadingModels = true;
+    notifyListeners();
+
+    try {
+      final newModels = await _apiService.getModels();
+      
+      if (newModels.isNotEmpty) {
+        _models = newModels;
+        
+        if (_config.modelId.isEmpty && _models.isNotEmpty) {
+          _config = _config.copyWith(
+            modelId: _models.first.id,
+            modelName: _models.first.name,
+          );
+          await _storageService.saveConfig(_config);
+        }
+      }
+    } catch (e) {
+      _error = e.toString();
+    }
+
+    _isLoadingModels = false;
+    notifyListeners();
+  }
+
   Future<void> setSide(String side) async {
     _config = _config.copyWith(side: side);
     await _storageService.saveConfig(_config);
