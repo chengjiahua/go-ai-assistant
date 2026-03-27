@@ -71,10 +71,10 @@ class ConfigProvider extends ChangeNotifier {
 
     try {
       final newModels = await _apiService.getModels();
-      
+
       if (newModels.isNotEmpty) {
         _models = newModels;
-        
+
         if (_config.modelId.isEmpty && _models.isNotEmpty) {
           _config = _config.copyWith(
             modelId: _models.first.id,

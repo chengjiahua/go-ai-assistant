@@ -168,6 +168,9 @@ for rec in result["recommendations"]:
 | recommendations | Array | 推荐落子列表（最多5个） |
 | recommendations[].x | String | X坐标（A-S，字母） |
 | recommendations[].y | Integer | Y坐标（1-19，数字） |
+| recommendations[].percent_x | Float | 推荐落子在截图上的X位置（0-1的百分比） |
+| recommendations[].percent_y | Float | 推荐落子在截图上的Y位置（0-1的百分比） |
+| recommendations[].stone_radius | Float | 棋子半径（相对于图片宽度的百分比），用于绘制落子标记 |
 | recommendations[].win_rate | Float | 胜率（0-1） |
 | recommendations[].score | Float | 预期目数差 |
 | recommendations[].visits | Integer | 搜索次数 |
@@ -183,6 +186,9 @@ for rec in result["recommendations"]:
     {
       "x": "D",
       "y": 16,
+      "percent_x": 0.123,
+      "percent_y": 0.456,
+      "stone_radius": 0.015,
       "win_rate": 0.52,
       "score": 1.5,
       "visits": 100,
@@ -191,6 +197,9 @@ for rec in result["recommendations"]:
     {
       "x": "Q",
       "y": 16,
+      "percent_x": 0.538,
+      "percent_y": 0.456,
+      "stone_radius": 0.015,
       "win_rate": 0.48,
       "score": 0.8,
       "visits": 85,

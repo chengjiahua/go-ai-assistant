@@ -3,231 +3,230 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Go AI 交互体验原型</title>
+    <title>AI Board Vision Pro - 极致交互</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Inter:wght@400;600;800&display=swap');
         
-        body { font-family: 'Inter', sans-serif; background: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-
-        /* 模拟手机容器 */
-        .phone-mockup {
-            width: 375px;
-            height: 750px;
-            background: #000;
-            border: 12px solid #333;
-            border-radius: 40px;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 50px 100px rgba(0,0,0,0.5);
+        :root {
+            --cyan-glow: #00f2ff;
+            --purple-glow: #7000ff;
         }
 
-        /* 模拟围棋App背景 */
-        .bg-app {
-            width: 100%; height: 100%;
-            object-fit: cover;
-            filter: brightness(0.8);
+        body { font-family: 'Inter', sans-serif; background: #020617; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; overflow: hidden; }
+
+        /* 手机框架 */
+        .phone {
+            width: 380px; height: 820px;
+            background: #000; border: 12px solid #1e293b; border-radius: 54px;
+            position: relative; overflow: hidden; box-shadow: 0 50px 100px rgba(0,0,0,0.8);
         }
 
-        /* 全屏透明蒙版 - 关键：用于监听外部点击 */
-        #dismiss-layer {
+        .board-bg { width: 100%; height: 100%; object-fit: cover; opacity: 0.85; }
+
+        /* 全屏透明交互层 */
+        #ai-overlay-layer {
+            position: absolute; inset: 0; z-index: 80;
+            display: none; background: rgba(0,0,0,0.2); backdrop-filter: blur(1px);
+        }
+
+        /* --- 炫酷 AI 棋子设计 --- */
+        .ai-stone-container {
             position: absolute;
-            inset: 0;
-            background: rgba(0,0,0,0.4);
-            z-index: 40;
-            display: none; /* 默认隐藏 */
-            backdrop-filter: blur(2px);
-        }
-
-        /* 悬浮球 */
-        .floating-ball {
-            width: 50px; height: 50px;
-            background: rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            position: absolute;
-            right: 15px; top: 120px;
-            z-index: 100;
-            cursor: pointer;
+            transform: translate(-50%, -50%); /* 确保(x,y)是中心点 */
             display: flex; justify-content: center; align-items: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            transition: transform 0.2s;
+            animation: stonePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
-        .floating-ball:active { transform: scale(0.9); }
-        .stone-icon { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, #444, #000); border: 1px solid #666; position: relative; }
-        .stone-icon::after { content: ''; position: absolute; top: 2px; right: 2px; width: 15px; height: 15px; background: #fff; border-radius: 50%; border: 1px solid #ccc; }
 
-        /* 三合一交互卡片 */
-        .main-card {
+        /* 外部呼吸环 */
+        .energy-ring {
             position: absolute;
-            left: 20px; top: 180px; /* 避开悬浮球位置 */
-            width: 280px;
-            background: rgba(30, 41, 59, 0.95);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 30px;
-            z-index: 50;
-            padding: 24px;
-            color: white;
-            display: none; /* 默认隐藏 */
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            transform-origin: top right;
-        }
-
-        /* 按钮样式 */
-        .btn-blue { background: #2563eb; width: 100%; padding: 12px; border-radius: 16px; font-weight: bold; transition: all 0.2s; }
-        .btn-blue:active { transform: scale(0.98); background: #1d4ed8; }
-
-        /* 加载动画 */
-        .spinner {
-            width: 40px; height: 40px;
-            border: 4px solid rgba(255,255,255,0.1);
-            border-top-color: #2563eb;
+            inset: -4px;
+            border: 2px solid var(--cyan-glow);
             border-radius: 50%;
-            animation: spin 1s linear infinite;
+            animation: ringPulse 2s infinite ease-in-out;
+            box-shadow: 0 0 15px var(--cyan-glow);
         }
+
+        /* 棋子主体 */
+        .ai-stone-body {
+            width: 100%; height: 100%;
+            border-radius: 50%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            position: relative; overflow: hidden;
+            backdrop-filter: blur(4px);
+        }
+
+        /* 黑子：黑洞质感 */
+        .stone-black {
+            background: radial-gradient(circle at 30% 30%, #334155 0%, #000 70%);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+        }
+        /* 白子：极光质感 */
+        .stone-white {
+            background: radial-gradient(circle at 30% 30%, #fff 0%, #cbd5e1 100%);
+            border: 1px solid #94a3b8;
+            color: #0f172a;
+        }
+
+        /* 字体自适应：根据半径变量计算 */
+        .win-rate-val {
+            font-family: 'Orbitron', sans-serif;
+            font-size: calc(var(--r) * 0.7px); /* 字体大小为半径的0.7倍 */
+            line-height: 1;
+            text-shadow: 0 0 10px rgba(0,242,255,0.5);
+        }
+        .rank-label {
+            font-size: calc(var(--r) * 0.3px);
+            font-weight: 800;
+            text-transform: uppercase;
+            opacity: 0.8;
+            margin-bottom: 2px;
+        }
+
+        @keyframes ringPulse {
+            0% { transform: scale(1); opacity: 0.8; box-shadow: 0 0 10px var(--cyan-glow); }
+            50% { transform: scale(1.15); opacity: 0.4; box-shadow: 0 0 25px var(--cyan-glow); }
+            100% { transform: scale(1); opacity: 0.8; box-shadow: 0 0 10px var(--cyan-glow); }
+        }
+
+        @keyframes stonePop {
+            from { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        /* --- 悬浮球与菜单 --- */
+        .floating-ball {
+            width: 56px; height: 56px;
+            background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(15px);
+            border: 1px solid rgba(255,255,255,0.2); border-radius: 50%;
+            position: absolute; right: 15px; top: 25%; z-index: 100;
+            cursor: pointer; display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); transition: all 0.3s;
+        }
+        .floating-ball:hover { transform: scale(1.05) rotate(15deg); border-color: var(--cyan-glow); }
+
+        .menu-pro {
+            position: absolute; right: 15px; top: 25%; width: 310px;
+            background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(30px);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 36px;
+            padding: 28px; color: white; z-index: 110; display: none;
+            box-shadow: 0 40px 80px rgba(0,0,0,0.7);
+        }
+
+        .btn-grad {
+            background: linear-gradient(135deg, #2563eb, #7000ff);
+            width: 100%; padding: 16px; border-radius: 20px;
+            font-weight: 800; letter-spacing: 1px; transition: all 0.3s;
+        }
+        .btn-grad:active { transform: scale(0.96); }
+
+        .loader { width: 24px; height: 24px; border: 3px solid rgba(255,255,255,0.1); border-top-color: var(--cyan-glow); border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* 结果行样式 */
-        .result-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: rgba(0,0,0,0.2); border-radius: 12px; margin-bottom: 8px; }
-
-        /* 进入动画 */
-        .animate-in { animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-        @keyframes popIn {
-            from { opacity: 0; transform: scale(0.9) translateY(10px); }
-            to { opacity: 1; transform: scale(1) translateY(0); }
-        }
     </style>
 </head>
 <body>
 
-    <div class="phone-mockup">
-        <!-- 模拟App底图 -->
-        <img src="https://images.unsplash.com/photo-1529699211952-734e80c4d42b?w=800" class="bg-app">
+<div class="phone">
+    <img src="https://raw.githubusercontent.com/chengjiahua/image-to-sgf/master/test_images/board_01.jpg" class="board-bg">
 
-        <!-- 全屏蒙版层 -->
-        <div id="dismiss-layer" onclick="closeUI()"></div>
-
-        <!-- 悬浮球 -->
-        <div class="floating-ball" onclick="toggleUI()">
-            <div class="stone-icon"></div>
-        </div>
-
-        <!-- 交互主卡片 -->
-        <div id="main-card" class="main-card">
-            
-            <!-- 状态 1: IDLE (主菜单) -->
-            <div id="state-idle">
-                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">当前模型 / MODEL</p>
-                <h4 class="text-sm font-semibold mb-4 text-blue-400">小米14-野狐围棋 (19×19)</h4>
-                
-                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2">执子方向 / SIDE</p>
-                <div class="flex gap-2 mb-6">
-                    <button id="sideB" onclick="setSide('B')" class="flex-1 py-2 bg-white text-black text-xs font-bold rounded-xl border-2 border-white">黑棋 B</button>
-                    <button id="sideW" onclick="setSide('W')" class="flex-1 py-2 bg-slate-800 text-slate-400 text-xs font-bold rounded-xl border-2 border-slate-700">白棋 W</button>
-                </div>
-
-                <button class="btn-blue text-sm" onclick="goAnalyze()">开始 AI 分析</button>
-            </div>
-
-            <!-- 状态 2: ANALYZING (加载中) -->
-            <div id="state-loading" class="hidden py-8 flex flex-col items-center">
-                <div class="spinner mb-4"></div>
-                <p class="text-sm font-medium text-slate-300">正在识别棋盘数据...</p>
-            </div>
-
-            <!-- 状态 3: RESULT (结果) -->
-            <div id="state-result" class="hidden">
-                <div class="flex justify-between items-center mb-4">
-                    <h4 class="text-xs font-bold text-slate-400 tracking-widest">AI 推荐落子</h4>
-                    <span class="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded">Score: +1.2</span>
-                </div>
-                
-                <div class="space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                    <div class="result-row border-l-4 border-red-500">
-                        <span class="text-xs font-bold text-slate-200">1. K9 (点三三)</span>
-                        <span class="text-[11px] font-mono text-green-400 font-bold">83%</span>
-                    </div>
-                    <div class="result-row border-l-4 border-blue-500">
-                        <span class="text-xs font-bold text-slate-200">2. K18 (挂角)</span>
-                        <span class="text-[11px] font-mono text-blue-400">79%</span>
-                    </div>
-                    <div class="result-row border-l-4 border-blue-500">
-                        <span class="text-xs font-bold text-slate-200">3. L17 (拆边)</span>
-                        <span class="text-[11px] font-mono text-blue-400">75%</span>
-                    </div>
-                </div>
-
-                <p class="text-[9px] text-slate-500 text-center mt-4 italic">点击屏幕任意位置关闭</p>
-            </div>
-
-        </div>
+    <div id="ai-overlay-layer" onclick="dismiss()">
+        <!-- 推荐子 -->
     </div>
 
-    <script>
-        const card = document.getElementById('main-card');
-        const dismissLayer = document.getElementById('dismiss-layer');
-        const states = {
-            idle: document.getElementById('state-idle'),
-            loading: document.getElementById('state-loading'),
-            result: document.getElementById('state-result')
-        };
+    <div class="floating-ball" onclick="openMenu()">
+        <div class="w-8 h-8 rounded-full bg-black border-2 border-white shadow-inner"></div>
+    </div>
 
-        let isOpen = false;
+    <div class="menu-pro" id="menu">
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Master AI</p>
+                <h4 class="text-sm font-bold text-white flex items-center gap-2">
+                    小米14-Pro Max <span id="lastLabel" class="text-[9px] bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded">LAST: R4</span>
+                </h4>
+            </div>
+            <button onclick="closeMenu()" class="p-2 hover:bg-white/10 rounded-full">✕</button>
+        </div>
 
-        // 切换 UI 展开/收起
-        function toggleUI() {
-            if (isOpen) {
-                closeUI();
-            } else {
-                openUI();
-            }
-        }
+        <div class="mb-8">
+            <p class="text-[10px] font-bold text-slate-500 mb-3 uppercase">选择行棋方 / SIDE</p>
+            <div class="flex bg-black/40 p-1.5 rounded-2xl border border-white/5">
+                <button id="setB" onclick="setSide('B')" class="flex-1 py-3 rounded-xl text-xs font-bold transition-all bg-white text-black">黑棋 (B)</button>
+                <button id="setW" onclick="setSide('W')" class="flex-1 py-3 rounded-xl text-xs font-bold transition-all text-slate-400">白棋 (W)</button>
+            </div>
+        </div>
 
-        function openUI() {
-            isOpen = true;
-            card.style.display = 'block';
-            card.classList.add('animate-in');
-            dismissLayer.style.display = 'block';
-            switchState('idle');
-        }
+        <button onclick="analyze()" class="btn-grad flex justify-center items-center gap-3">
+            <span id="btnText">立即启动分析</span>
+            <div id="load" class="hidden loader"></div>
+        </button>
+    </div>
+</div>
 
-        function closeUI() {
-            isOpen = false;
-            card.style.display = 'none';
-            dismissLayer.style.display = 'none';
-        }
+<script>
+    let side = 'B';
 
-        // 切换内部状态
-        function switchState(stateName) {
-            Object.keys(states).forEach(key => {
-                states[key].classList.toggle('hidden', key !== stateName);
-            });
-        }
+    function openMenu() { document.getElementById('menu').style.display = 'block'; }
+    function closeMenu() { document.getElementById('menu').style.display = 'none'; }
+    
+    function setSide(s) {
+        side = s;
+        document.getElementById('setB').className = s==='B' ? "flex-1 py-3 rounded-xl text-xs font-bold bg-white text-black" : "flex-1 py-3 rounded-xl text-xs font-bold text-slate-400";
+        document.getElementById('setW').className = s==='W' ? "flex-1 py-3 rounded-xl text-xs font-bold bg-white text-black" : "flex-1 py-3 rounded-xl text-xs font-bold text-slate-400";
+    }
 
-        // 模拟分析逻辑
-        function goAnalyze() {
-            switchState('loading');
+    function analyze() {
+        const t = document.getElementById('btnText');
+        const l = document.getElementById('load');
+        t.innerText = "正在解析局面...";
+        l.classList.remove('hidden');
+
+        setTimeout(() => {
+            t.innerText = "立即启动分析";
+            l.classList.add('hidden');
             
-            // 模拟 1.5 秒后返回结果
-            setTimeout(() => {
-                switchState('result');
-            }, 1500);
-        }
+            // 模拟坐标数据
+            // 假设棋子半径 r = 30px
+            const radius = 30;
+            const points = [
+                {x: 187, y: 388, win: "68.4%", rank: "1", side: side},
+                {x: 125, y: 326, win: "62.1%", rank: "2", side: side}
+            ];
 
-        // 选色交互
-        function setSide(side) {
-            const b = document.getElementById('sideB');
-            const w = document.getElementById('sideW');
-            if(side === 'B') {
-                b.className = "flex-1 py-2 bg-white text-black text-xs font-bold rounded-xl border-2 border-white transition-all";
-                w.className = "flex-1 py-2 bg-slate-800 text-slate-400 text-xs font-bold rounded-xl border-2 border-slate-700 transition-all";
-            } else {
-                w.className = "flex-1 py-2 bg-white text-black text-xs font-bold rounded-xl border-2 border-white transition-all";
-                b.className = "flex-1 py-2 bg-slate-800 text-slate-400 text-xs font-bold rounded-xl border-2 border-slate-700 transition-all";
-            }
-        }
-    </script>
+            renderPoints(points, radius);
+            closeMenu();
+        }, 1200);
+    }
+
+    function renderPoints(pts, r) {
+        const layer = document.getElementById('ai-overlay-layer');
+        layer.innerHTML = '';
+        pts.forEach(p => {
+            const container = document.createElement('div');
+            container.className = 'ai-stone-container';
+            // 将半径 r 传入 CSS 变量
+            container.style.setProperty('--r', r);
+            container.style.width = (r * 2) + 'px';
+            container.style.height = (r * 2) + 'px';
+            container.style.left = p.x + 'px';
+            container.style.top = p.y + 'px';
+
+            container.innerHTML = `
+                <div class="energy-ring"></div>
+                <div class="ai-stone-body ${p.side === 'B' ? 'stone-black' : 'stone-white'}">
+                    <div class="rank-label">推荐 ${p.rank}</div>
+                    <div class="win-rate-val">${p.win}</div>
+                </div>
+            `;
+            layer.appendChild(container);
+        });
+        layer.style.display = 'block';
+    }
+
+    function dismiss() { document.getElementById('ai-overlay-layer').style.display = 'none'; }
+</script>
+
 </body>
 </html>

@@ -101,6 +101,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 'score': r.score,
                 'visits': r.visits,
                 'move_sgf': r.moveSgf,
+                'percent_x': r.percentX,
+                'percent_y': r.percentY,
+                'stone_radius': r.stoneRadius,
               },
             )
             .toList(),

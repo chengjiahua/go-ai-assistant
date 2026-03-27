@@ -52,6 +52,13 @@ class FloatingService : Service() {
     private var screenWidth = 0
     private var screenHeight = 0
     private var screenDensity = 0
+    private var screenRealWidth = 0
+    private var screenRealHeight = 0
+    private var yOffset = 0
+    private var xOffset = 0
+    private var statusBarHeight = 0
+    private var screenshotWidth = 0
+    private var screenshotHeight = 0
     
     private var resultData: Intent? = null
     private var resultCode: Int = 0
@@ -64,12 +71,18 @@ class FloatingService : Service() {
     private var savedBallY: Int? = null
     
     private var currentSide = "B"
+    private var displayMode = "coordinate" // "coordinate" 或 "overlay"
     private var currentModelId = ""
     private var currentModelName = ""
     private var currentServerUrl = ""
     private var models: MutableList<ModelInfo> = mutableListOf()
     private var lastRecommendations: ArrayList<String> = ArrayList()
     private var lastWinRates: ArrayList<Double> = ArrayList()
+    private var lastPercentX: ArrayList<Double> = ArrayList()
+    private var lastPercentY: ArrayList<Double> = ArrayList()
+    private var lastStoneRadius: Double = 0.0
+    
+    private var aiOverlayView: View? = null
 
     companion object {
         const val STATE_IDLE = 0
@@ -106,12 +119,28 @@ class FloatingService : Service() {
         
         mediaProjectionManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         
-        val metrics = DisplayMetrics()
         val display = getSystemService(WINDOW_SERVICE) as WindowManager
+        
+        val metrics = DisplayMetrics()
         display.defaultDisplay.getMetrics(metrics)
         screenWidth = metrics.widthPixels
         screenHeight = metrics.heightPixels
         screenDensity = metrics.densityDpi
+        
+        val realMetrics = DisplayMetrics()
+        display.defaultDisplay.getRealMetrics(realMetrics)
+        screenRealWidth = realMetrics.widthPixels
+        screenRealHeight = realMetrics.heightPixels
+        
+        val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
+        if (resourceId > 0) {
+            statusBarHeight = resources.getDimensionPixelSize(resourceId)
+        }
+        
+        Log.d(TAG, "=== Init Screen Info ===")
+        Log.d(TAG, "screenWidth: $screenWidth, screenHeight: $screenHeight")
+        Log.d(TAG, "screenRealWidth: $screenRealWidth, screenRealHeight: $screenRealHeight")
+        Log.d(TAG, "statusBarHeight: $statusBarHeight")
         
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, createNotification())
@@ -119,6 +148,25 @@ class FloatingService : Service() {
         Handler(Looper.getMainLooper()).postDelayed({
             showFloatingBall()
         }, 500)
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        
+        val display = getSystemService(WINDOW_SERVICE) as WindowManager
+        val metrics = DisplayMetrics()
+        display.defaultDisplay.getMetrics(metrics)
+        screenWidth = metrics.widthPixels
+        screenHeight = metrics.heightPixels
+        
+        val realMetrics = DisplayMetrics()
+        display.defaultDisplay.getRealMetrics(realMetrics)
+        screenRealWidth = realMetrics.widthPixels
+        screenRealHeight = realMetrics.heightPixels
+        
+        Log.d(TAG, "=== Configuration Changed ===")
+        Log.d(TAG, "Orientation: ${if (newConfig.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) "LANDSCAPE" else "PORTRAIT"}")
+        Log.d(TAG, "screenRealWidth: $screenRealWidth, screenRealHeight: $screenRealHeight")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -510,11 +558,36 @@ class FloatingService : Service() {
                 setPadding(0, 0, 0, (4 * density).toInt())
             })
             
-            addView(TextView(context).apply {
-                text = if (currentModelName.isNotEmpty()) currentModelName else "未选择模型"
-                textSize = 13f
-                setTextColor(if (currentModelName.isNotEmpty()) 0xFF3b82f6.toInt() else 0xFF64748b.toInt())
-                setPadding(0, 0, 0, (16 * density).toInt())
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(0, 0, 0, (16 * density).toInt())
+                }
+                gravity = Gravity.CENTER_VERTICAL
+                
+                addView(TextView(context).apply {
+                    text = if (currentModelName.isNotEmpty()) currentModelName else "未选择模型"
+                    textSize = 13f
+                    setTextColor(if (currentModelName.isNotEmpty()) 0xFF3b82f6.toInt() else 0xFF64748b.toInt())
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                })
+                
+                if (lastRecommendations.isNotEmpty()) {
+                    addView(TextView(context).apply {
+                        val top3 = lastRecommendations.take(3).joinToString(" ")
+                        text = top3
+                        textSize = 11f
+                        setTextColor(0xFF22c55e.toInt())
+                        background = GradientDrawable().apply {
+                            setColor(0x2022c55e.toInt())
+                            cornerRadius = 6 * density
+                        }
+                        setPadding((8 * density).toInt(), (4 * density).toInt(), (8 * density).toInt(), (4 * density).toInt())
+                    })
+                }
             })
             
             addView(TextView(context).apply {
@@ -526,6 +599,16 @@ class FloatingService : Service() {
             })
             
             addView(createSideSelector(density))
+            
+            addView(TextView(context).apply {
+                text = "显示样式 / DISPLAY"
+                textSize = 10f
+                setTextColor(0xB3FFFFFF.toInt())
+                letterSpacing = 0.1f
+                setPadding(0, (16 * density).toInt(), 0, (8 * density).toInt())
+            })
+            
+            addView(createDisplayModeSelector(density))
             
             addView(createAnalyzeButton(density))
         }
@@ -569,6 +652,52 @@ class FloatingService : Service() {
             setOnTouchListener { v, event ->
                 if (event.action == MotionEvent.ACTION_UP) {
                     currentSide = side
+                    cardContainer?.removeAllViews()
+                    cardContainer?.addView(createIdleView())
+                }
+                true
+            }
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun createDisplayModeSelector(density: Float): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setPadding((4 * density).toInt(), (4 * density).toInt(), (4 * density).toInt(), (4 * density).toInt())
+            background = GradientDrawable().apply {
+                setColor(0x60000000.toInt())
+                cornerRadius = 12 * density
+            }
+            
+            addView(createDisplayModeButton("坐标", "coordinate", displayMode == "coordinate", density))
+            addView(createDisplayModeButton("落子", "overlay", displayMode == "overlay", density))
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun createDisplayModeButton(text: String, mode: String, isSelected: Boolean, density: Float): TextView {
+        return TextView(this).apply {
+            this.text = text
+            textSize = 12f
+            gravity = Gravity.CENTER
+            setPadding(0, (10 * density).toInt(), 0, (10 * density).toInt())
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            
+            background = GradientDrawable().apply {
+                setColor(if (isSelected) 0xFFFFFFFF.toInt() else 0x00000000.toInt())
+                cornerRadius = 8 * density
+            }
+            setTextColor(if (isSelected) 0xFF000000.toInt() else 0xFFFFFFFF.toInt())
+            setTypeface(null, if (isSelected) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+            
+            setOnTouchListener { v, event ->
+                if (event.action == MotionEvent.ACTION_UP) {
+                    displayMode = mode
                     cardContainer?.removeAllViews()
                     cardContainer?.addView(createIdleView())
                 }
@@ -874,17 +1003,34 @@ class FloatingService : Service() {
             
             val points = ArrayList<String>()
             val winRates = ArrayList<Double>()
+            val percentXList = ArrayList<Double>()
+            val percentYList = ArrayList<Double>()
+            var radius = 0.0
+            
             for (i in 0 until recommendations.length()) {
                 val rec = recommendations.getJSONObject(i)
                 val point = "${rec.optString("x")}${rec.optInt("y")}"
                 points.add(point)
                 winRates.add(rec.optDouble("win_rate"))
+                percentXList.add(rec.optDouble("percent_x"))
+                percentYList.add(rec.optDouble("percent_y"))
+                if (rec.optDouble("stone_radius") > 0) {
+                    radius = rec.optDouble("stone_radius")
+                }
             }
             
             lastRecommendations = points
             lastWinRates = winRates
+            lastPercentX = percentXList
+            lastPercentY = percentYList
+            lastStoneRadius = radius
             
-            switchState(STATE_RESULT)
+            if (displayMode == "overlay") {
+                showAIOverlay()
+                hideCard()
+            } else {
+                switchState(STATE_RESULT)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "onAnalyzeResult error: ${e.message}")
             onAnalyzeError("解析结果失败: ${e.message}")
@@ -963,6 +1109,19 @@ class FloatingService : Service() {
                     image = imageReader?.acquireLatestImage()
                     if (image != null) {
                         val bitmap = imageToBitmap(image)
+                        
+                        screenshotWidth = bitmap.width
+                        screenshotHeight = bitmap.height
+                        
+                        Log.d(TAG, "=== Screen Info Debug ===")
+                        Log.d(TAG, "screenRealWidth: $screenRealWidth, screenRealHeight: $screenRealHeight")
+                        Log.d(TAG, "screenshotWidth: $screenshotWidth, screenshotHeight: $screenshotHeight")
+                        
+                        xOffset = (screenRealWidth - screenshotWidth) / 2
+                        yOffset = (screenRealHeight - screenshotHeight) / 2
+                        
+                        Log.d(TAG, "xOffset: $xOffset, yOffset: $yOffset")
+                        
                         base64Result = bitmapToBase64(bitmap)
                     }
                 } catch (e: Exception) {
@@ -1013,5 +1172,187 @@ class FloatingService : Service() {
         val outputStream = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.WEBP, 75, outputStream)
         return Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+    }
+    
+    private fun showAIOverlay() {
+        if (lastPercentX.isEmpty() || lastPercentY.isEmpty()) return
+        
+        hideAIOverlay()
+        
+        val overlayParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        )
+        overlayParams.gravity = Gravity.TOP or Gravity.LEFT
+        
+        aiOverlayView = createAIOverlayView()
+        windowManager?.addView(aiOverlayView, overlayParams)
+    }
+    
+    private fun hideAIOverlay() {
+        aiOverlayView?.let {
+            windowManager?.removeView(it)
+            aiOverlayView = null
+        }
+    }
+    
+    @SuppressLint("ClickableViewAccessibility")
+    private fun createAIOverlayView(): View {
+        val density = resources.displayMetrics.density
+        val radius = if (lastStoneRadius > 0) lastStoneRadius * screenshotWidth else 28.0
+        
+        return FrameLayout(this).apply {
+            setBackgroundColor(0x00000000)
+            
+            post {
+                val location = IntArray(2)
+                getLocationOnScreen(location)
+                val offsetX = location[0]
+                val offsetY = location[1]
+                
+                Log.d(TAG, "=== Calibration Info ===")
+                Log.d(TAG, "Overlay view location - offsetX: $offsetX, offsetY: $offsetY")
+                Log.d(TAG, "This represents the offset between overlay's (0,0) and physical screen's (0,0)")
+                
+                for (i in lastPercentX.indices) {
+                    if (i >= 5) break
+                    
+                    val percentX = lastPercentX[i]
+                    val percentY = lastPercentY[i]
+                    
+                    val drawX = (percentX * screenshotWidth) - offsetX
+                    val drawY = (percentY * screenshotHeight) - offsetY
+                    
+                    val winRate = if (i < lastWinRates.size) lastWinRates[i] else 0.0
+                    
+                    Log.d(TAG, "=== Draw Stone $i (Calibrated) ===")
+                    Log.d(TAG, "percentX: $percentX, percentY: $percentY")
+                    Log.d(TAG, "screenshotWidth: $screenshotWidth, screenshotHeight: $screenshotHeight")
+                    Log.d(TAG, "offsetX: $offsetX, offsetY: $offsetY")
+                    Log.d(TAG, "calculated drawX: $drawX, drawY: $drawY")
+                    
+                    addView(createAIStoneView(drawX, drawY, radius, winRate, density, i == 0))
+                }
+            }
+            
+            setOnTouchListener { _, event ->
+                if (event.action == MotionEvent.ACTION_DOWN) {
+                    val touchX = event.x
+                    val touchY = event.y
+                    
+                    var touchedStone = false
+                    for (i in lastPercentX.indices) {
+                        if (i >= 5) break
+                        
+                        val percentX = lastPercentX[i]
+                        val percentY = lastPercentY[i]
+                        
+                        val location = IntArray(2)
+                        getLocationOnScreen(location)
+                        val offsetX = location[0]
+                        val offsetY = location[1]
+                        
+                        val drawX = (percentX * screenshotWidth) - offsetX
+                        val drawY = (percentY * screenshotHeight) - offsetY
+                        
+                        val distance = Math.sqrt(
+                            Math.pow(touchX - drawX, 2.0) + 
+                            Math.pow(touchY - drawY, 2.0)
+                        )
+                        
+                        if (distance <= radius) {
+                            touchedStone = true
+                            break
+                        }
+                    }
+                    
+                    hideAIOverlay()
+                    
+                    !touchedStone
+                } else {
+                    false
+                }
+            }
+        }
+    }
+    
+    private fun createAIStoneView(
+        pixelX: Double,
+        pixelY: Double,
+        radius: Double,
+        winRate: Double,
+        density: Float,
+        isFirst: Boolean
+    ): View {
+        return FrameLayout(this).apply {
+            val size = (radius * 2).toInt()
+            val left = (pixelX - radius).toInt()
+            val top = (pixelY - radius).toInt()
+            
+            layoutParams = FrameLayout.LayoutParams(size, size).apply {
+                setMargins(left, top, 0, 0)
+            }
+            
+            addView(View(context).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+                
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    
+                    if (currentSide == "B") {
+                        setColor(0xB3000000.toInt())
+                        setStroke((2 * density).toInt(), 0xFF22d3ee.toInt())
+                    } else {
+                        setColor(0xB3FFFFFF.toInt())
+                        setStroke((2 * density).toInt(), 0xFF0891b2.toInt())
+                    }
+                }
+            })
+            
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+                
+                addView(TextView(context).apply {
+                    text = "${(winRate * 100).toInt()}"
+                    textSize = (radius * 0.35).toFloat()
+                    setTextColor(if (currentSide == "B") 0xFFFFFFFF.toInt() else 0xFF1e293b.toInt())
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    gravity = Gravity.CENTER
+                    layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                })
+            })
+            
+            if (isFirst) {
+                animate()
+                    .scaleX(1.05f)
+                    .scaleY(1.05f)
+                    .setDuration(750)
+                    .withEndAction {
+                        animate()
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .setDuration(750)
+                            .start()
+                    }
+                    .start()
+            }
+        }
     }
 }

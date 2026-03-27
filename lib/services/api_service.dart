@@ -193,6 +193,9 @@ class Recommendation {
   final double score;
   final int visits;
   final String moveSgf;
+  final double percentX;
+  final double percentY;
+  final double stoneRadius;
 
   Recommendation({
     required this.x,
@@ -201,6 +204,9 @@ class Recommendation {
     required this.score,
     required this.visits,
     required this.moveSgf,
+    this.percentX = 0,
+    this.percentY = 0,
+    this.stoneRadius = 0,
   });
 
   factory Recommendation.fromJson(Map<String, dynamic> json) {
@@ -211,6 +217,9 @@ class Recommendation {
       score: (json['score'] ?? 0.0).toDouble(),
       visits: json['visits'] ?? 0,
       moveSgf: json['move_sgf'] ?? '',
+      percentX: (json['percent_x'] ?? 0.0).toDouble(),
+      percentY: (json['percent_y'] ?? 0.0).toDouble(),
+      stoneRadius: (json['stone_radius'] ?? 0.0).toDouble(),
     );
   }
 }
