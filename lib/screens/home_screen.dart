@@ -30,12 +30,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   static const platform = MethodChannel('com.goai.go_ai_assistant/floating');
 
   Timer? _debounceTimer;
+  TextEditingController? _serverUrlController;
+  String? _serverUrlError;
 
   @override
   void initState() {
     super.initState();
     _checkPermissions();
     _setupMethodCallHandler();
+  }
+
+  void _initServerUrlController(String serverUrl) {
+    _serverUrlController ??= TextEditingController(text: serverUrl);
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    _serverUrlController?.dispose();
+    super.dispose();
   }
 
   Future<void> _checkPermissions() async {
@@ -501,10 +514,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       _buildSettingsField(
                         label: '订阅地址',
                         value: provider.config.serverUrl,
+                        isLoading: provider.isLoadingModels,
                         onChanged: (value) {
                           if (value.isNotEmpty) {
                             provider.setServerUrl(value.trim());
                           }
+                        },
+                        onRefresh: () {
+                          final url = _serverUrlController?.text.trim() ?? '';
+                          if (url.isNotEmpty) {
+                            provider.setServerUrl(url);
+                          }
+                        },
+                        onClearError: () {
+                          provider.clearError();
                         },
                       ),
                       const SizedBox(height: 16),
@@ -521,6 +544,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           }
                         },
                         isLoading: provider.isLoadingModels,
+                        error: provider.error,
                       ),
                       const SizedBox(height: 24),
                       SizedBox(
@@ -565,69 +589,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     required String label,
     required String value,
     required Function(String) onChanged,
-  }) {
-    final controller = TextEditingController(text: value);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.white70,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          style: const TextStyle(fontSize: 14, color: Colors.white),
-          decoration: InputDecoration(
-            hintText: 'http://192.168.x.x:8000',
-            hintStyle: TextStyle(
-              fontSize: 14,
-              color: Colors.white.withValues(alpha: 0.4),
-            ),
-            filled: true,
-            fillColor: const Color(0xFF1e293b),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20),
-              borderSide: const BorderSide(color: Color(0xFF334155)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20),
-              borderSide: const BorderSide(color: Color(0xFF334155)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20),
-              borderSide: const BorderSide(color: Color(0xFF3b82f6)),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 18,
-              vertical: 18,
-            ),
-          ),
-          onChanged: (text) {
-            _debounceTimer?.cancel();
-            _debounceTimer = Timer(const Duration(milliseconds: 800), () {
-              if (text.isNotEmpty) {
-                onChanged(text.trim());
-              }
-            });
-          },
-          onSubmitted: onChanged,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSettingsDropdown({
-    required String label,
-    required String value,
-    required List<GoModel> items,
-    required Function(String?) onChanged,
+    required Function() onRefresh,
+    required Function() onClearError,
     bool isLoading = false,
   }) {
+    _initServerUrlController(value);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -651,12 +618,142 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ],
         ),
         const SizedBox(height: 8),
+        TextField(
+          controller: _serverUrlController,
+          style: const TextStyle(fontSize: 14, color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'http://192.168.x.x:8000',
+            hintStyle: TextStyle(
+              fontSize: 14,
+              color: Colors.white.withValues(alpha: 0.4),
+            ),
+            filled: true,
+            fillColor: const Color(0xFF1e293b),
+            errorText: _serverUrlError,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: const BorderSide(color: Color(0xFF334155)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: const BorderSide(color: Color(0xFF334155)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: const BorderSide(color: Color(0xFF3b82f6)),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 18,
+              vertical: 18,
+            ),
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_serverUrlController?.text.isNotEmpty ?? false)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.clear,
+                      size: 18,
+                      color: Colors.white54,
+                    ),
+                    onPressed: () {
+                      _serverUrlController?.clear();
+                      setState(() {
+                        _serverUrlError = null;
+                      });
+                      onClearError();
+                    },
+                  ),
+                IconButton(
+                  icon: const Icon(
+                    Icons.refresh,
+                    size: 18,
+                    color: Color(0xFF3b82f6),
+                  ),
+                  onPressed: isLoading ? null : onRefresh,
+                  tooltip: '同步模型列表',
+                ),
+                const SizedBox(width: 8),
+              ],
+            ),
+            suffixIconConstraints: const BoxConstraints(
+              minWidth: 0,
+              minHeight: 0,
+            ),
+          ),
+          onChanged: (text) {
+            setState(() {
+              _serverUrlError = null;
+            });
+            onClearError();
+            _debounceTimer?.cancel();
+            _debounceTimer = Timer(const Duration(seconds: 1), () {
+              if (text.isNotEmpty) {
+                onChanged(text.trim());
+              }
+            });
+          },
+          onSubmitted: (text) {
+            _debounceTimer?.cancel();
+            if (text.isNotEmpty) {
+              onChanged(text.trim());
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSettingsDropdown({
+    required String label,
+    required String value,
+    required List<GoModel> items,
+    required Function(String?) onChanged,
+    bool isLoading = false,
+    String? error,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.white70,
+              ),
+            ),
+            const Spacer(),
+            if (isLoading)
+              Row(
+                children: [
+                  const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    '正在加载模型...',
+                    style: TextStyle(fontSize: 12, color: Colors.white54),
+                  ),
+                ],
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 18),
           decoration: BoxDecoration(
             color: const Color(0xFF1e293b),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF334155)),
+            border: Border.all(
+              color: error != null
+                  ? Colors.red.withValues(alpha: 0.5)
+                  : const Color(0xFF334155),
+            ),
           ),
           child: DropdownButton<String>(
             value: (value.isNotEmpty && items.any((item) => item.id == value))
@@ -666,9 +763,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             underline: const SizedBox(),
             dropdownColor: const Color(0xFF1e293b),
             style: const TextStyle(fontSize: 14, color: Colors.white),
-            hint: const Text(
-              '选择模型...',
-              style: TextStyle(fontSize: 14, color: Colors.white54),
+            hint: Text(
+              isLoading ? '正在加载模型...' : (items.isEmpty ? '暂无可用模型' : '选择模型...'),
+              style: const TextStyle(fontSize: 14, color: Colors.white54),
             ),
             items: items.map((model) {
               return DropdownMenuItem<String>(
@@ -679,6 +776,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             onChanged: onChanged,
           ),
         ),
+        if (error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8, left: 4),
+            child: Text(
+              error,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.red.withValues(alpha: 0.8),
+              ),
+            ),
+          ),
       ],
     );
   }

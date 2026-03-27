@@ -54,11 +54,26 @@ class ConfigProvider extends ChangeNotifier {
         await _storageService.saveConfig(_config);
       }
     } catch (e) {
-      _error = e.toString();
+      _error = _formatError(e.toString());
     }
 
     _isLoadingModels = false;
     notifyListeners();
+  }
+
+  String _formatError(String error) {
+    if (error.contains('SocketException') ||
+        error.contains('Connection refused')) {
+      return '无法连接到服务器，请检查订阅地址是否正确';
+    } else if (error.contains('TimeoutException') ||
+        error.contains('timeout')) {
+      return '连接超时，请检查网络或服务器状态';
+    } else if (error.contains('404')) {
+      return '接口不存在，请检查订阅地址格式';
+    } else if (error.contains('FormatException') || error.contains('Invalid')) {
+      return '订阅地址格式错误，请输入正确的URL';
+    }
+    return '获取模型失败: $error';
   }
 
   Future<void> refreshModels() async {
@@ -67,6 +82,7 @@ class ConfigProvider extends ChangeNotifier {
 
   Future<void> refreshModelsIfNotEmpty() async {
     _isLoadingModels = true;
+    _error = null;
     notifyListeners();
 
     try {
@@ -84,7 +100,7 @@ class ConfigProvider extends ChangeNotifier {
         }
       }
     } catch (e) {
-      _error = e.toString();
+      _error = _formatError(e.toString());
     }
 
     _isLoadingModels = false;
@@ -107,7 +123,13 @@ class ConfigProvider extends ChangeNotifier {
     _config = _config.copyWith(serverUrl: serverUrl);
     await _storageService.saveConfig(_config);
     _apiService.updateServerUrl(serverUrl);
+    _error = null;
     notifyListeners();
     await _loadModels();
+  }
+
+  void clearError() {
+    _error = null;
+    notifyListeners();
   }
 }
